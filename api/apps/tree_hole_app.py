@@ -35,6 +35,17 @@ def get_treeholes(order_by='latest', limit=20):
             "comment_count": h.comment_count,
             "create_time": h.create_time.strftime("%Y-%m-%d %H:%M"),
         })
+
+    # for h in holes:
+    #     user = UserService.get_by_id(h['user_id'])
+    #     result.append({
+    #         "id": h['id'],
+    #         "content": h['content'],
+    #         "user_nick": user.name_nick if user else "匿名用户",
+    #         "like_count": h['like_count'],
+    #         "comment_count": h['comment_count'],
+    #         "create_time": h['create_time'],
+    #     })
     return result
 
 
