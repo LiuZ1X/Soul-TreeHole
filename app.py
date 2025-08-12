@@ -16,6 +16,7 @@ from api.apps.emotion_app import get_all_emotion_records
 from api.apps.sas_app import process_sas_scores
 from api.apps.statistics_app import generate_stats_charts, get_stats_text
 from api.apps.user_app import user_login, user_register, get_user_info_by_username, update_password, get_user_info_by_id
+from api.apps.tree_hole_app import create_treehole, get_treeholes, add_comment_to_treehole, like_treehole, get_comments_for_treehole
 
 # SAS焦虑自评量表题目
 sas_questions = [
@@ -78,6 +79,47 @@ def create_gradio_interface():
         with gr.Column(visible=False, elem_id="main_panel") as main_panel:
             # 修改Markdown为动态显示
             current_user_display = gr.Markdown("### 当前用户：未登录")
+
+            # 树洞功能
+            with gr.Tab("心情树洞"):
+                gr.Markdown("## 🌳 灵魂树洞 🌳 - 分享你的喜怒哀乐")
+                
+                with gr.Row():
+                    # 左侧：发布和展示
+                    with gr.Column(scale=2):
+                        gr.Markdown("### 发布新内容")
+                        new_treehole_content = gr.Textbox(label="有什么想说的？", placeholder="在这里写下你的心情...", lines=3)
+                        publish_btn = gr.Button("发布到树洞", variant="primary")
+                        
+                        gr.Markdown("---")
+                        
+                        gr.Markdown("### 树洞广场")
+                        treehole_order = gr.Radio(["最新", "热门"], label="排序方式", value="最新")
+                        treehole_list = gr.Dataframe(
+                            headers=["ID", "内容", "发布者", "点赞数", "评论数", "时间"],
+                            datatype=["number", "str", "str", "number", "number", "str"],
+                            label="树洞列表",
+                            interactive=False,
+                            max_height=400
+                        )
+                        refresh_treehole_btn = gr.Button("刷新列表")
+
+                    # 右侧：评论和详情
+                    with gr.Column(scale=1):
+                        gr.Markdown("### 评论区")
+                        selected_treehole_id = gr.Textbox(label="当前查看的树洞ID", interactive=False)
+                        comment_list = gr.Dataframe(
+                            headers=["评论人", "评论内容", "时间"],
+                            datatype=["str", "str", "str"],
+                            label="评论列表",
+                            interactive=False,
+                            max_height=300
+                        )
+                        
+                        new_comment_text = gr.Textbox(label="发表你的评论", placeholder="写下你的善意...", lines=2)
+                        comment_btn = gr.Button("评论")
+                        like_btn = gr.Button("❤️ 点赞")
+
             # 主对话选项卡
             with gr.Tab("主对话"):
                 gr.Markdown("# 🌟 心灵伙伴 - 您的AI心理健康助手")
@@ -311,7 +353,65 @@ def create_gradio_interface():
                     outputs=[operation_status, users_table]
                 )
 
+
         # 事件处理
+        # --- 树洞事件处理 ---
+        def update_treehole_list(order):
+            order_map = {"最新": "latest", "热门": "hot"}
+            holes = get_treeholes(order_by=order_map[order])
+            df_data = [[h['id'], h['content'], h['user_nick'], h['like_count'], h['comment_count'], h['create_time']] for h in holes]
+            return df_data
+
+        def handle_publish(content, current_user):
+            if not content.strip():
+                gr.Warning("内容不能为空哦！")
+                return update_treehole_list("最新") # Return current list
+            user_id = current_user['id']
+            create_treehole(content, user_id)
+            gr.Info("发布成功！")
+            return update_treehole_list("最新")
+
+        def handle_treehole_select(df, evt: gr.SelectData):
+            if evt.index[0] is not None:
+                selected_id = df.iloc[evt.index[0], 0]
+                comments = get_comments_for_treehole(selected_id)
+                comment_data = [[c['user_nick'], c['comment_text'], c['create_time']] for c in comments]
+                return selected_id, comment_data
+            return None, []
+
+        def handle_add_comment(treehole_id, comment_text, current_user):
+            if not treehole_id:
+                gr.Warning("请先选择一个树洞！")
+                return get_comments_for_treehole(treehole_id)
+            if not comment_text.strip():
+                gr.Warning("评论不能为空！")
+                return get_comments_for_treehole(treehole_id)
+            
+            user_id = current_user['id']
+            add_comment_to_treehole(int(treehole_id), user_id, comment_text)
+            gr.Info("评论成功！AI伙伴稍后也会加入讨论哦。")
+            # Refresh comments
+            comments = get_comments_for_treehole(int(treehole_id))
+            return [[c['user_nick'], c['comment_text'], c['create_time']] for c in comments]
+
+        def handle_like(treehole_id, current_user):
+            if not treehole_id:
+                gr.Warning("请先选择一个树洞！")
+                return
+            user_id = current_user['id']
+            like_treehole(int(treehole_id), user_id)
+            gr.Info("点赞成功！")
+            # 这里可以返回更新后的点赞数，但为简化，仅提示
+
+        # 绑定事件
+        publish_btn.click(handle_publish, inputs=[new_treehole_content, current_user], outputs=treehole_list)
+        refresh_treehole_btn.click(update_treehole_list, inputs=treehole_order, outputs=treehole_list)
+        treehole_order.change(update_treehole_list, inputs=treehole_order, outputs=treehole_list)
+        treehole_list.select(handle_treehole_select, inputs=treehole_list, outputs=[selected_treehole_id, comment_list])
+        comment_btn.click(handle_add_comment, inputs=[selected_treehole_id, new_comment_text, current_user], outputs=comment_list)
+        like_btn.click(handle_like, inputs=[selected_treehole_id, current_user], outputs=None)
+                
+
         def login(username, password):
             user_data = user_login(username, password)
             if not user_data:
@@ -422,6 +522,8 @@ def create_gradio_interface():
 
         # 在界面加载时设置欢迎消息
         _interface.load(set_welcome_message, outputs=chatbot)
+        # 在界面加载时更新树洞列表
+        _interface.load(lambda: update_treehole_list("最新"), outputs=treehole_list)
 
     return _interface
 
