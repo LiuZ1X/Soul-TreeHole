@@ -93,7 +93,9 @@ class TreeHoleService:
                  .where(cls.model.is_deleted == False)
                  .order_by(cls.model.create_time.desc())
                  .limit(limit))
-        return [(t.id, t.content, t.image_url, t.emotion_tag, t.create_time.strftime("%Y-%m-%d %H:%M:%S"))
+        # return [(t.id, t.content, t.image_url, t.emotion_tag, t.create_time.strftime("%Y-%m-%d %H:%M:%S"))
+        #         for t in query]
+        return [{'user_id': t.user_id, 'content': t.content, 'image_url': t.image_url, 'emotion_tag': t.emotion_tag, 'create_time': t.create_time.strftime("%Y-%m-%d %H:%M:%S")}
                 for t in query]
     
     @classmethod
@@ -104,7 +106,9 @@ class TreeHoleService:
                  .where((cls.model.is_deleted == False) & (cls.model.is_public == True))
                  .order_by(cls.model.is_top.desc(), cls.model.like_count.desc(), cls.model.create_time.desc())
                  .limit(limit))
-        return [(t.id, t.content, t.image_url, t.emotion_tag, t.like_count, t.is_top, t.create_time.strftime("%Y-%m-%d %H:%M:%S"))
+        # return [(t.id, t.content, t.image_url, t.emotion_tag, t.like_count, t.is_top, t.create_time.strftime("%Y-%m-%d %H:%M:%S"))
+        #         for t in query]
+        return [{'user_id': t.user_id, 'content': t.content, 'image_url': t.image_url, 'emotion_tag': t.emotion_tag, 'create_time': t.create_time.strftime("%Y-%m-%d %H:%M:%S")}
                 for t in query]
 
     @classmethod

@@ -104,8 +104,8 @@ def auto_comment_treehole(treehole_id, comment_text, user_id=None, anonymous_id=
     assistant_response, _ = role_play_session.step(input_msg)
     ai_comment = assistant_response.msg.content
 
-    # 4. 获取或创建AI用户
-    ai_user, created = User.get_or_create(
+    # 4. 获取或创建AI用户 TODO UserService中暂时没有这个功能
+    ai_user, created = UserService.get_or_create(
         username='mindmate_ai',
         defaults={'name_nick': 'AI伙伴', 'password': 'password'}
     )

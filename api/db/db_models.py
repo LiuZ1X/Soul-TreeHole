@@ -72,7 +72,7 @@ class TreeHole(BaseModel):
     user_id = ForeignKeyField(User, backref='tree_holes', index=True)  # 关联注册用户（加索引）
     device_id = TextField(null=True, index=True)  # 关联匿名用户（可为空，加索引）
     content = TextField()  # 树洞内容（文本）
-    image_url = TextField()  # 图片OSS地址（可为空）
+    image_url = TextField(null=True)  # 图片OSS地址（可为空）
     emotion_tag = TextField(
         constraints=[SQL("CHECK (emotion_tag IN ('positive', 'negative', 'neutral'))")],
         default='neutral'

@@ -56,12 +56,12 @@ is_logged_in = False
 
 
 def create_gradio_interface():
-    with gr.Blocks(title="心灵伙伴 - AI心理健康助手", theme=gr.themes.Soft()) as _interface:
+    with gr.Blocks(title="心灵树洞 - AI智能小树洞", theme=gr.themes.Soft()) as _interface:
         current_user = gr.State({"id": None, "name": None, "is_admin": False})
 
         # 用户认证面板
         with gr.Column(visible=True) as auth_panel:
-            gr.Markdown("# 🌟 心灵伙伴 - 您的AI心理健康助手")
+            gr.Markdown("# 🌳 灵魂树洞 🌳 - 分享你的喜怒哀乐")
             with gr.Tabs():
                 with gr.Tab("登录", id="login"):
                     login_username = gr.Textbox(label="用户名")
