@@ -90,13 +90,12 @@ class TreeHole(BaseModel):
 # 互动记录表
 class Interaction(BaseModel):
     treehole_id = ForeignKeyField(TreeHole, backref='interactions', index=True)  # 关联树洞内容
-    # interaction_type = EnumField(['like', 'comment', 'share', 'dislike', null=True])  # 互动类型
+    user_id = ForeignKeyField(User, backref='interactions', null=True, index=True)  # 关联注册用户（可为空）
     interaction_type = TextField(
         constraints=[SQL("CHECK (interaction_type IN ('like', 'comment', 'share', 'dislike'))")],
         null=True,  # 允许为空，表示未指定互动类型
         index=True  # 添加索引以提高查询性能
     )
-    user_id = ForeignKeyField(User, backref='interactions', null=True, index=True)  # 关联注册用户（可为空）
     anonymous_id = TextField(null=True, index=True)  # 关联匿名用户（可为空）
     comment_text = TextField(null=True)  # 评论内容（仅当 interaction_type='comment' 时有效）
     create_time = DateTimeField(default=datetime.now)

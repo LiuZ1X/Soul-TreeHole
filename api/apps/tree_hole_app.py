@@ -36,17 +36,29 @@ def get_treeholes(order_by='latest', limit=20):
             "create_time": h.create_time.strftime("%Y-%m-%d %H:%M"),
         })
 
-    # for h in holes:
-    #     user = UserService.get_by_id(h['user_id'])
-    #     result.append({
-    #         "id": h['id'],
-    #         "content": h['content'],
-    #         "user_nick": user.name_nick if user else "匿名用户",
-    #         "like_count": h['like_count'],
-    #         "comment_count": h['comment_count'],
-    #         "create_time": h['create_time'],
-    #     })
     return result
+
+
+def get_treehole_by_id(treehole_id):
+    """根据ID获取树洞详情info"""
+    treehole = TreeHoleService.get_by_id(treehole_id)
+    if not treehole:
+        return None
+
+    user = UserService.get_by_id(treehole.user_id)
+    full_content = {
+        "id": treehole.id,
+        "content": treehole.content,
+        "user_nick": user.name_nick if user else "匿名用户",
+        "emotion_tag": treehole.emotion_tag,
+        "image_url": treehole.image_url,
+        "create_time": treehole.create_time.strftime("%Y-%m-%d %H:%M"),
+        "is_public": treehole.is_public,
+        "like_count": treehole.like_count,
+        "comment_count": treehole.comment_count,
+    }
+
+    return full_content
 
 
 def add_comment_to_treehole(treehole_id, user_id, comment_text):
@@ -54,8 +66,8 @@ def add_comment_to_treehole(treehole_id, user_id, comment_text):
     # 保存用户评论
     TreeHoleService.add_comment(treehole_id=treehole_id, user_id=user_id, comment_text=comment_text)
 
-    # 触发AI自动评论
-    auto_comment_treehole(treehole_id, comment_text, user_id)
+    # # 触发AI自动评论
+    # auto_comment_treehole(treehole_id, comment_text, user_id)
 
     return {"status": "success", "message": "评论成功"}
 
@@ -69,29 +81,37 @@ def like_treehole(treehole_id, user_id):
 
 def get_comments_for_treehole(treehole_id):
     """获取树洞的评论"""
-    # interactions = Interaction.select().where(
-    #     (Interaction.treehole_id == treehole_id) & (Interaction.interaction_type == 'comment')
-    # ).order_by(Interaction.create_time.desc())
+    all_interactions = TreeHoleService.get_interactions(treehole_id)
+ 
+    #从all_interactions过滤出类型为'comment的记录
+    comment_interactions = [
+        interaction for interaction in all_interactions
+        if interaction.interaction_type == 'comment'
+    ]
 
-    # comments = []
-    # for i in interactions:
-    #     user = UserService.get_by_id(i.user_id) if i.user_id else None
-    #     user_nick = "AI伙伴" if (user and user.username == 'mindmate_ai') else (user.name_nick if user else "匿名")
+    # 按时间倒序排序
+    sorted_comments = sorted(
+        comment_interactions,
+        key=lambda i: i.create_time,
+        reverse=True
+    )
 
-    #     comments.append({
-    #         "user_nick": user_nick,
-    #         "comment_text": i.comment_text,
-    #         "create_time": i.create_time.strftime("%Y-%m-%d %H:%M"),
-    #     })
-
-    interactions = TreeHoleService.get_interactions(treehole_id)
     comments = []
-    print("\nget_comments_for_treehole success!!!\n")
+    for i in sorted_comments:
+        user = UserService.get_by_id(i.user_id) if i.user_id else None
+        user_nick = "AI伙伴" if (user and user.username == 'mindmate_ai') else (user.name_nick if user else "匿名")
+
+        comments.append({
+            "user_nick": user_nick,
+            "comment_text": i.comment_text,
+            "create_time": i.create_time.strftime("%Y-%m-%d %H:%M"),
+        })
+
     return comments
 
 
 def auto_comment_treehole(treehole_id, comment_text, user_id=None, anonymous_id=None):
-    """自动评论树洞内容"""
+    """自动评论树洞的内容加评论区的内容"""
     # 这里可以调用Camel-AI的预设角色进行评论生成、自动点赞等功能
 
     # 1. 创建角色扮演会话
@@ -108,7 +128,7 @@ def auto_comment_treehole(treehole_id, comment_text, user_id=None, anonymous_id=
     # 2. 初始化对话
     treehole_content = TreeHoleService.model.get_by_id(treehole_id).content
     input_msg = role_play_session.init_chat(
-        f"这是我刚才发布的树洞内容：'{treehole_content}'。这是刚刚收到的评论：'{comment_text}'。请你作为我的心灵伙伴，给我一些温暖的回复。"
+        f"这是我刚才发布的树洞内容：'{treehole_content}'。这是刚刚收到的评论：'{comment_text}'。请你作为我的心灵伙伴，给我一些口语化的温暖的回复。"
     )
 
     # 3. 生成AI回复

@@ -11,6 +11,14 @@ class TreeHoleService:
     model = TreeHole
 
     @classmethod
+    def get_by_id(cls, treehole_id):
+        """根据ID获取树洞"""
+        try:
+            return cls.model.get(cls.model.id == treehole_id)
+        except cls.model.DoesNotExist:
+            return None
+
+    @classmethod
     def add_comment(cls, treehole_id, user_id=None, anonymous_id=None, comment_text=None):
         """新增评论并同步更新评论数"""
         from api.db.db_models import Interaction
@@ -113,6 +121,7 @@ class TreeHoleService:
     def get_interactions(cls, treehole_id):
         """获取树洞的互动记录"""
         query = cls.model.select().where(cls.model.id == treehole_id)
+        # 反向关系(backref)查询, 类似于SELECT * FROM interaction WHERE treehole_id = xxx
         if query.exists():
             return query[0].interactions
         return []

@@ -102,6 +102,7 @@ class UserService:
 
     @classmethod
     def get_by_id(cls, user_id):
+        """根据用户ID获取用户的所有信息"""
         try:
             return User.get_by_id(user_id)
         except User.DoesNotExist:
