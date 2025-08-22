@@ -9,7 +9,7 @@ from api.apps.emotion_app import get_all_emotion_records
 from api.apps.sas_app import process_sas_scores
 from api.apps.statistics_app import generate_stats_charts, get_stats_text
 from api.apps.user_app import user_login, user_register, get_user_info_by_username, update_password, get_user_info_by_id
-from api.apps.tree_hole_app import create_treehole, get_treeholes, add_comment_to_treehole, like_treehole, get_comments_for_treehole, get_treehole_by_id
+from api.apps.tree_hole_app import create_treehole, get_treeholes, add_comment_to_treehole, like_treehole, get_comments_for_treehole, get_treehole_by_id, auto_comment_treehole
 
 # SAS焦虑自评量表题目
 sas_questions = [
@@ -49,6 +49,8 @@ is_logged_in = False
 
 # css 颜色
 def create_gradio_interface():
+
+    #自定义的主题颜色
     custom_css = """
     body, .gradio-container {
         background-color: #FCF8F3 !important;
@@ -112,6 +114,8 @@ def create_gradio_interface():
         color: #E57F84 !important;
     }
     """
+
+    
     # with gr.Blocks(title="心灵树洞 - AI智能小树洞", theme=gr.themes.Soft(), css=custom_css) as _interface:
     with gr.Blocks(title="心灵树洞 - AI智能小树洞", css=custom_css) as _interface:
         current_user = gr.State({"id": None, "name": None, "is_admin": False})
@@ -121,7 +125,7 @@ def create_gradio_interface():
             gr.Markdown("# 🌳 灵魂树洞 🌳 - 分享你的喜怒哀乐")
             with gr.Tabs():
                 with gr.Tab("登录", id="login"):
-                    login_username = gr.Textbox(label="用户名")
+                    login_username = gr.Textbox(label="用户名", value="admin") #TODO 上线记得删除
                     login_password = gr.Textbox(label="密码", type="password")
                     login_btn = gr.Button("登录")
                     login_status = gr.Textbox(label="登录状态", interactive=False)
@@ -145,7 +149,7 @@ def create_gradio_interface():
                     # 左侧：发布和展示
                     with gr.Column(scale=1):
                         gr.Markdown("### 发布新内容")
-                        new_treehole_content = gr.Textbox(label="有什么想说的？", placeholder="在这里写下你的心情...", lines=3)
+                        new_treehole_content = gr.Textbox(label="有什么想说的？", placeholder="在这里写下你的心情...", lines=12, max_lines=14)
                         publish_btn = gr.Button("发布到树洞", variant="primary")
                         
                         gr.Markdown("---")
@@ -182,14 +186,16 @@ def create_gradio_interface():
                                     scale=3
                                 )
 
-                        content_treehole = gr.Textbox(label="树洞内容", interactive=False,lines=8, max_lines=12)
-                        comment_list = gr.Dataframe(
-                            headers=["评论人", "评论内容", "时间"],
-                            datatype=["str", "str", "str"],
-                            label="评论区",
-                            interactive=False,
-                            max_height=300
-                        )
+                        content_treehole = gr.Textbox(label="树洞内容", interactive=False,lines=12, max_lines=14)
+                        
+                        # # 替换原来的 comment_list Dataframe
+                        # with gr.Column() as comment_section:
+                        #     gr.Markdown("### 评论区")
+                        #     comment_container = gr.Column(elem_id="comment_container")
+                        # 替换原来的 comment_list Dataframe
+                        with gr.Column() as comment_section:
+                            gr.Markdown("### 评论区")
+                            comment_display = gr.Markdown("暂无评论，快来抢沙发吧！", elem_id="comment_display")                            
                         
                         new_comment_text = gr.Textbox(label="发表你的评论", placeholder="写下你的善意...", lines=2)
                         with gr.Row():
@@ -210,7 +216,7 @@ def create_gradio_interface():
                     with gr.Column(scale=1):
                         emotion_chart = gr.Plot(label="Emotion Trend")
 
-            with gr.Tab("心理评估"):
+            with gr.Tab("心理评估", visible=False):
                 gr.Markdown("## 焦虑自评量表(SAS)")
                 gr.Markdown("""
                 ### 评分说明：
@@ -248,7 +254,7 @@ def create_gradio_interface():
                         outputs=sas_result
                     )
 
-            with gr.Tab("放松训练"):
+            with gr.Tab("放松训练", visible=False):
                 relaxation_type = gr.Radio(
                     choices=list(relaxation_guides.keys()),
                     label="选择放松训练类型"
@@ -459,35 +465,54 @@ def create_gradio_interface():
             user_id = current_user['id']
             create_treehole(content, user_id)
             gr.Info("发布成功！")
+            #清除输入框内容
+            new_treehole_content.value = ""
             return update_treehole_list("最新")
 
+        def create_comment_markdown(comments):
+            """创建评论的Markdown显示"""
+            if not comments:
+                return "暂无评论，快来抢沙发吧！"
+            
+            markdown_content = ""
+            for i, comment in enumerate(comments):
+                markdown_content += f"""
+---
+**{comment['user_nick']}** · {comment['create_time']}
+
+{comment['comment_text']}
+
+"""
+            return markdown_content
+        
         def handle_treehole_select(df, evt: gr.SelectData):
             if evt.index[0] is not None:
                 selected_id = df.iloc[evt.index[0], 0]
-
+                
                 hole = get_treehole_by_id(selected_id)
                 full_content = hole['content'] if hole else "内容已被删除或不存在"
-
-
+                
                 comments = get_comments_for_treehole(selected_id)
-                comment_data = [[c['user_nick'], c['comment_text'], c['create_time']] for c in comments]
-                return selected_id, full_content, comment_data
-            return None, []
+                # 返回评论显示组件
+                comment_display = create_comment_markdown(comments)
+                return selected_id, full_content, comment_display
+            return None, "", gr.Column([gr.Markdown("请选择一个树洞")])
 
         def handle_add_comment(treehole_id, comment_text, current_user):
             if not treehole_id:
                 gr.Warning("请先选择一个树洞！")
-                return get_comments_for_treehole(treehole_id)
+                return gr.Column([gr.Markdown("请先选择一个树洞")])
             if not comment_text.strip():
                 gr.Warning("评论不能为空！")
-                return get_comments_for_treehole(treehole_id)
+                return create_comment_markdown(get_comments_for_treehole(treehole_id))
             
             user_id = current_user['id']
             add_comment_to_treehole(int(treehole_id), user_id, comment_text)
             gr.Info("评论成功！AI伙伴稍后也会加入讨论哦。")
-            # Refresh comments
+            
+            # 刷新评论显示
             comments = get_comments_for_treehole(int(treehole_id))
-            return [[c['user_nick'], c['comment_text'], c['create_time']] for c in comments]
+            return create_comment_markdown(comments)
 
         def handle_like(treehole_id, current_user):
             if not treehole_id:
@@ -498,12 +523,33 @@ def create_gradio_interface():
             gr.Info("点赞成功！")
             # 这里可以返回更新后的点赞数，但为简化，仅提示
 
-        # 绑定事件
+        def handle_ai_comment(treehole_id: int):
+            if not treehole_id:
+                gr.Warning("请先选择一个树洞！")
+                return gr.Column([gr.Markdown("请先选择一个树洞")])
+            
+            gr.Info("AI伙伴已经加入评论啦!")
+            auto_comment_treehole(treehole_id)
+            
+            # 刷新评论显示
+            comments = get_comments_for_treehole(int(treehole_id))
+            return create_comment_markdown(comments)
+
+        # # 绑定按钮事件
+
+        # 发布树洞内容
         publish_btn.click(handle_publish, inputs=[new_treehole_content, current_user], outputs=treehole_list)
+        # 刷新树洞列表
         refresh_treehole_btn.click(update_treehole_list, inputs=treehole_order, outputs=treehole_list)
+        # 树洞列表排序
         treehole_order.change(update_treehole_list, inputs=treehole_order, outputs=treehole_list)
-        treehole_list.select(handle_treehole_select, inputs=treehole_list, outputs=[selected_treehole_id,content_treehole, comment_list])
-        comment_btn.click(handle_add_comment, inputs=[selected_treehole_id, new_comment_text, current_user], outputs=comment_list)
+        # 选择树洞后更新详情和评论
+        treehole_list.select(handle_treehole_select, inputs=treehole_list, outputs=[selected_treehole_id,content_treehole, comment_display])
+        # 添加评论
+        comment_btn.click(handle_add_comment, inputs=[selected_treehole_id, new_comment_text, current_user], outputs=comment_display)
+        # 召唤AI评论按钮
+        ai_comment_tbn.click(handle_ai_comment, inputs=[selected_treehole_id], outputs=comment_display)
+        # 点赞按钮
         like_btn.click(handle_like, inputs=[selected_treehole_id, current_user], outputs=None)
                 
 

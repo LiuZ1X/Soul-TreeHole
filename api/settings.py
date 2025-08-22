@@ -16,6 +16,9 @@ from api.db.db_models import DBManager
 from api.utils import get_base_config
 from api.utils.t_crypt import decrypt_api_key, generate_key
 
+
+
+
 EMOTION_RECORDS = []
 databaseConn = None
 CHAT_MDL = None

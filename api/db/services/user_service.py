@@ -9,7 +9,7 @@
 """
 import hashlib
 from datetime import datetime
-
+# from typing import Union, Optional, str, Dict
 from api.db.db_models import User
 
 
@@ -107,3 +107,31 @@ class UserService:
             return User.get_by_id(user_id)
         except User.DoesNotExist:
             return None
+        
+    @classmethod
+    def get_or_create(
+        cls, username :str, 
+        name_nick:str=None, 
+        password:str = "123456", 
+        is_admin: bool = False,
+        **kwargs
+        ) -> tuple[User, bool]:
+
+        """根据用户名获取或创建用户
+        Args:
+            username: 用户名
+            name_nick: 昵称，默认为用户名
+            password: 密码，默认为"123456"
+            is_admin: 是否为管理员，默认为False
+            **kwargs: 其他额外参数
+        Returns:
+            tuple[User, bool]: (用户对象, 是否为新创建的用户)
+        
+        """
+        user = UserService.get_by_username(username)
+        if user:
+            return user, False
+        # 如果用户不存在，则创建新用户
+        # 默认密码为"123456"，昵称为用户名
+        user = cls.register(username=username, name_nick=name_nick, password=password, is_admin=is_admin)
+        return user, True
