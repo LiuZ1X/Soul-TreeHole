@@ -7,7 +7,9 @@
 @project: resonant-soul
 @desc: 
 """
-from camel.societies import RolePlaying
+from camel.agents import ChatAgent
+from camel.messages import BaseMessage
+from camel.types import RoleType
 
 from api.apps.emotion_app import analyze_emotion, save_emotion_record, generate_emotion_chart
 from api.db.services.conversation_service import ConversationService
@@ -21,36 +23,39 @@ def process_user_input(current_user, user_input, history: list):
     save_emotion_record(emotions, user_input, user_id)
     print(f"检测到的情绪: {emotions}")
 
-    # 创建角色会话
-    task_prompt = "作为心灵伙伴AI心理健康助手，直接以第一人称与大学生进行心理健康对话 "
-    role_play_session = RolePlaying(
-        assistant_role_name="心灵伙伴AI心理健康助手",
-        assistant_agent_kwargs=dict(model=CHAT_MDL),
-        user_role_name="在校大学生",
-        user_agent_kwargs=dict(model=CHAT_MDL),
-        task_prompt=task_prompt,
-        with_task_specify=True,
-        task_specify_agent_kwargs=dict(model=CHAT_MDL),
-        output_language='中文'
+    # 创建单个心理健康助手智能体
+    system_message = f"""
+    你是一位专业的心灵伙伴AI心理健康助手。
+    请以第一人称身份与大学生进行温暖、专业的心理健康对话。
+    
+    当前检测到的用户情绪：{emotions}
+    
+    请根据用户的情绪状态，提供针对性的支持、理解和建议。
+    回复要温暖、共情，并具有实用性。
+    """
+    
+    assistant = ChatAgent(
+        system_message=system_message,
+        model=CHAT_MDL
     )
 
-    # 初始化提示词
-    input_msg = role_play_session.init_chat()
-    input_msg.content = f"""
-    Instruction: 请以心灵伙伴AI心理健康助手的第一人称身份回应。根据检测到的情绪 {emotions}，提供针对性的支持和建议。
-    Input: {user_input}
-    """
+    # 构建用户消息
+    user_msg = BaseMessage(
+        role_name="需要帮助的大学生",
+        role_type=RoleType.USER,
+        meta_dict={},
+        content=user_input
+    )
 
-    # 调用大模型进行对话
-    assistant_response, _ = role_play_session.step(input_msg)
-    response_content = assistant_response.msg.content
+    print('agent输入: ', user_msg.content)
 
-    # 数据后处理
-    if "Solution:" in response_content:
-        response_content = response_content.split("Solution:")[1]
-        response_content = response_content.split("Next request.")[0].strip()
-        response_content = response_content.split("next request.")[0].strip()
+    # 生成agent回复
+    response = assistant.step(user_msg)
+    response_content = response.msg.content
 
+    print('agent输出: ', response_content)
+
+    # 简单的后处理 - 移除可能的第三人称表述
     third_person_phrases = [
         "作为心理咨询师，",
         "作为一名心理咨询师，",
