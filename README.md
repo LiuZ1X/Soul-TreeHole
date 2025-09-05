@@ -16,7 +16,6 @@
 
 <!-- https://modelscope.cn/studios/Datawhale/resonant-soul/summary -->
 
-![登录注册](./resources/login-register.png)
 
 ![对话系统](./resources/tree-hole-system.png)
 
